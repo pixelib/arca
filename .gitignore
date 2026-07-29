@@ -9,5 +9,5 @@
 *.db-wal
 /.idea
 /deploy
-/deploy.s
+/deploy.sh
 /docs/plans
