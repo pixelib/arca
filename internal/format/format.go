@@ -15,7 +15,6 @@ type Coordinates struct {
 
 type Layout interface {
 	Coordinates(path string) (Coordinates, bool)
-	ComponentDirectory(coordinates Coordinates) string
 	ComponentAt(prefix string) (Coordinates, bool)
 	ContentType(filename string) string
 	Mutable(path string) bool

@@ -22,10 +22,6 @@ func (Layout) Coordinates(path string) (format.Coordinates, bool) {
 	}, true
 }
 
-func (Layout) ComponentDirectory(coordinates format.Coordinates) string {
-	return ComponentDirectory(coordinates.Namespace, coordinates.Name, coordinates.Version)
-}
-
 func (Layout) ComponentAt(prefix string) (format.Coordinates, bool) {
 	segments := strings.FieldsFunc(prefix, func(character rune) bool { return character == '/' })
 	if len(segments) < 2 {

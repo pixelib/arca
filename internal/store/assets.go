@@ -69,6 +69,12 @@ func underPrefix(prefix string) assetSelection {
 	}
 }
 
+func ofComponents(componentIDs []string) assetSelection {
+	return func(query *gorm.DB) *gorm.DB {
+		return query.Where("component_id IN ?", componentIDs)
+	}
+}
+
 // idleSince falls back to the creation time so an asset stored before access
 // tracking existed is aged from when it arrived rather than treated as ancient.
 func idleSince(cutoff int64) assetSelection {

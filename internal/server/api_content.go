@@ -218,22 +218,9 @@ func (s *Server) routeArtifactFiles(writer http.ResponseWriter, request *http.Re
 		return err
 	}
 
-	prefix := layoutFor(repository).ComponentDirectory(format.Coordinates{
-		Namespace: namespace,
-		Name:      name,
-		Version:   version,
-	}) + "/"
-
-	entries, err := s.store.BrowseDirectory(repository.ID, prefix)
+	files, err := s.store.ComponentFiles(repository.ID, namespace, name, version)
 	if err != nil {
 		return err
-	}
-
-	files := make([]store.BrowseEntry, 0, len(entries))
-	for _, entry := range entries {
-		if entry.Type == store.EntryFile {
-			files = append(files, entry)
-		}
 	}
 
 	writeJSON(writer, http.StatusOK, map[string]any{
@@ -242,7 +229,6 @@ func (s *Server) routeArtifactFiles(writer http.ResponseWriter, request *http.Re
 		"namespace":  namespace,
 		"name":       name,
 		"version":    version,
-		"prefix":     prefix,
 		"files":      files,
 	})
 	return nil
@@ -272,18 +258,12 @@ func (s *Server) routeDeleteArtifact(writer http.ResponseWriter, request *http.R
 		return fail(http.StatusNotFound, "Artifact not found")
 	}
 
-	layout := layoutFor(repository)
-
-	prefixes := make([]string, 0, len(components))
+	versions := make([]string, 0, len(components))
 	for _, component := range components {
-		prefixes = append(prefixes, layout.ComponentDirectory(format.Coordinates{
-			Namespace: namespace,
-			Name:      name,
-			Version:   component.Version,
-		})+"/")
+		versions = append(versions, component.Version)
 	}
 
-	keys, err := s.store.DeleteComponents(repository.ID, prefixes)
+	keys, err := s.store.DeleteComponentVersions(repository.ID, namespace, name, versions)
 	if err != nil {
 		return err
 	}

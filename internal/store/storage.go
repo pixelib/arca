@@ -2,6 +2,8 @@ package store
 
 import (
 	"strings"
+
+	"arca/internal/store/models"
 )
 
 var knownExtensions = []string{
@@ -146,19 +148,27 @@ func (s *Store) ComponentsByRepository(repositoryID string, search string, limit
 	return usage, query.Scan(&usage).Error
 }
 
-func (s *Store) DeleteComponents(repositoryID string, prefixes []string) ([]string, error) {
+// DeleteComponentVersions removes the assets belonging to the named versions of
+// one component, following the component link rather than a path prefix.
+func (s *Store) DeleteComponentVersions(repositoryID, namespace, name string, versions []string) ([]string, error) {
 	var keys []string
 
 	err := s.Transaction(func(tx *Store) error {
-		for _, prefix := range prefixes {
-			removed, err := tx.deleteMatchingAssets(repositoryID, underPrefix(prefix))
-			if err != nil {
-				return err
-			}
-			keys = append(keys, removed...)
+		var ids []string
+		err := tx.db.Model(&models.Component{}).
+			Where("repository_id = ? AND namespace = ? AND name = ? AND version IN ?",
+				repositoryID, namespace, name, versions).
+			Pluck("id", &ids).Error
+		if err != nil {
+			return err
 		}
-		if len(keys) == 0 {
+		if len(ids) == 0 {
 			return nil
+		}
+
+		keys, err = tx.deleteMatchingAssets(repositoryID, ofComponents(ids))
+		if err != nil || len(keys) == 0 {
+			return err
 		}
 		return tx.PruneOrphanComponents(repositoryID)
 	})

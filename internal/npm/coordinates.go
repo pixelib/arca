@@ -132,10 +132,6 @@ func (Layout) Coordinates(path string) (format.Coordinates, bool) {
 	}, true
 }
 
-func (Layout) ComponentDirectory(coordinates format.Coordinates) string {
-	return ComponentDirectory(coordinates.Namespace, coordinates.Name, coordinates.Version)
-}
-
 func (Layout) ComponentAt(prefix string) (format.Coordinates, bool) {
 	namespace, name, rest, ok := splitStoragePath(prefix)
 	if !ok || len(rest) != 0 {

@@ -54,6 +54,37 @@ func (s *Store) ComponentVersions(repositoryID, namespace, name string) ([]model
 	return components, err
 }
 
+// ComponentFiles lists the assets that make up a component version. It follows
+// the component link rather than a path prefix, because a version occupies a
+// directory in some formats and a single file in others.
+func (s *Store) ComponentFiles(repositoryID, namespace, name, version string) ([]BrowseEntry, error) {
+	files := []FileEntry{}
+	err := s.db.Raw(
+		`SELECT assets.path, assets.size, assets.updated_at
+		 FROM assets
+		 JOIN components ON components.id = assets.component_id
+		 WHERE assets.repository_id = ? AND components.namespace = ? AND components.name = ? AND components.version = ?
+		 ORDER BY assets.path`,
+		repositoryID, namespace, name, version,
+	).Scan(&files).Error
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]BrowseEntry, 0, len(files))
+	for _, file := range files {
+		size, updated := file.Size, file.UpdatedAt
+		entries = append(entries, BrowseEntry{
+			Name:      file.Path[strings.LastIndex(file.Path, "/")+1:],
+			Path:      file.Path,
+			Type:      EntryFile,
+			Size:      &size,
+			UpdatedAt: &updated,
+		})
+	}
+	return entries, nil
+}
+
 func (s *Store) ComponentExists(repositoryID, namespace, name string) (bool, error) {
 	var count int64
 	err := s.db.Model(&models.Component{}).
