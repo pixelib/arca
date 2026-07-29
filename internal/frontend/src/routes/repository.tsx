@@ -10,6 +10,7 @@ import { EmptyState, ErrorBlock, LoadingBlock } from '@/components/ui/feedback'
 import { Coordinate, CopyButton } from '@/components/copy-button'
 import { MavenUsage } from '@/components/snippets/maven'
 import { NPMUsage } from '@/components/snippets/npm'
+import { P2Usage } from '@/components/snippets/p2'
 import {
   api,
   type ArtifactSummary,
@@ -249,6 +250,7 @@ function Overview({
 
 function Usage({ repository }: { repository: RepositoryDetail }) {
   if (repository.format === 'npm') return <NPMUsage repository={repository} />
+  if (repository.format === 'p2') return <P2Usage repository={repository} />
   return <MavenUsage repository={repository} />
 }
 

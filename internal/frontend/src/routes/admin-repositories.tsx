@@ -116,6 +116,7 @@ function CreateRepositoryDialog() {
 
   const isProxy = type === 'proxy'
   const isNPM = format === 'npm'
+  const isP2 = format === 'p2'
 
   const mutation = useMutation({
     mutationFn: async () =>
@@ -189,6 +190,7 @@ function CreateRepositoryDialog() {
               >
                 <option value="maven2">Maven 2, jars and poms</option>
                 <option value="npm">npm, packages and tarballs</option>
+                <option value="p2">p2, Eclipse bundles and features</option>
               </Select>
             </Field>
             <Field label="Type">
@@ -213,14 +215,20 @@ function CreateRepositoryDialog() {
                   hint={
                     isNPM
                       ? 'The registry base URL this repository mirrors.'
-                      : 'The Maven 2 base URL this repository mirrors.'
+                      : isP2
+                        ? 'The host root to mirror, without a path. Update sites point at children above their own directory, which only resolves from the root.'
+                        : 'The Maven 2 base URL this repository mirrors.'
                   }
                 >
                   <Input
                     value={remoteUrl}
                     onChange={(event) => setRemoteUrl(event.target.value)}
                     placeholder={
-                      isNPM ? 'https://registry.npmjs.org' : 'https://repo1.maven.org/maven2'
+                      isNPM
+                        ? 'https://registry.npmjs.org'
+                        : isP2
+                          ? 'https://download.eclipse.org'
+                          : 'https://repo1.maven.org/maven2'
                     }
                     className="font-mono"
                   />

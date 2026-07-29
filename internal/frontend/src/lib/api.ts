@@ -55,7 +55,7 @@ export type Permission = 'read' | 'write' | 'admin'
 export type Policy = 'release' | 'snapshot' | 'mixed'
 export type Visibility = 'public' | 'private'
 export type RepositoryType = 'hosted' | 'proxy'
-export type RepositoryFormat = 'maven2' | 'npm'
+export type RepositoryFormat = 'maven2' | 'npm' | 'p2'
 
 export interface User {
   id: string

@@ -3,6 +3,7 @@ package format
 const (
 	Maven2 = "maven2"
 	NPM    = "npm"
+	P2     = "p2"
 )
 
 type Coordinates struct {

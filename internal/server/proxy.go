@@ -1,9 +1,11 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -17,7 +19,10 @@ import (
 	"arca/internal/store/models"
 )
 
-const accessTouchInterval = time.Hour
+const (
+	accessTouchInterval = time.Hour
+	maxRewriteBytes     = 64 << 20
+)
 
 var errRemoteMissing = errors.New("server: the upstream does not have this path")
 
@@ -44,6 +49,10 @@ type proxyFetch struct {
 	CachePath  string
 	RemotePath string
 	Accept     string
+	// Rewrite adapts an upstream document before it is cached. Unlike the npm
+	// packument rewrite this one does not depend on the request, so it runs once
+	// on the way in and the stored digests describe what is actually served.
+	Rewrite func(document []byte) ([]byte, error)
 }
 
 func pathFetch(path string) proxyFetch {
@@ -201,7 +210,7 @@ func (s *Server) refreshFromRemote(repository *models.Repository, fetch proxyFet
 
 	switch {
 	case response.Status == http.StatusOK:
-		return s.storeRemoteAsset(repository, fetch.CachePath, response)
+		return s.storeRemoteAsset(repository, fetch, response)
 
 	case response.Status == http.StatusNotModified && cached != nil:
 		return s.store.MarkAssetRefreshed(
@@ -223,12 +232,21 @@ func (s *Server) refreshFromRemote(repository *models.Repository, fetch proxyFet
 	}
 }
 
-func (s *Server) storeRemoteAsset(repository *models.Repository, path string, response *proxy.Response) error {
+func (s *Server) storeRemoteAsset(repository *models.Repository, fetch proxyFetch, response *proxy.Response) error {
 	now := store.NowMillis()
 
-	_, err := s.storeUpload(repository, path, response.Body, uploadDetails{
+	body := io.Reader(response.Body)
+	if fetch.Rewrite != nil {
+		rewritten, err := rewriteRemoteDocument(fetch, response.Body)
+		if err != nil {
+			return err
+		}
+		body = rewritten
+	}
+
+	_, err := s.storeUpload(repository, fetch.CachePath, body, uploadDetails{
 		FetchedAt:          now,
-		ExpiresAt:          cacheExpiry(layoutFor(repository), repository, path),
+		ExpiresAt:          cacheExpiry(layoutFor(repository), repository, fetch.CachePath),
 		LastAccessedAt:     now,
 		RemoteETag:         response.ETag,
 		RemoteLastModified: response.LastModified,
@@ -240,7 +258,26 @@ func (s *Server) storeRemoteAsset(repository *models.Repository, path string, re
 		return err
 	}
 
-	return s.store.ClearRemoteMiss(repository.ID, path)
+	return s.store.ClearRemoteMiss(repository.ID, fetch.CachePath)
+}
+
+// rewriteRemoteDocument buffers the upstream body so it can be transformed.
+// Only documents small enough to hold are eligible: a rewrite that cannot run
+// fails the fetch rather than caching bytes nobody inspected.
+func rewriteRemoteDocument(fetch proxyFetch, body io.Reader) (io.Reader, error) {
+	document, err := io.ReadAll(io.LimitReader(body, maxRewriteBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(document)) > maxRewriteBytes {
+		return nil, fmt.Errorf("upstream document exceeds the %d byte rewrite limit", maxRewriteBytes)
+	}
+
+	rewritten, err := fetch.Rewrite(document)
+	if err != nil {
+		return nil, fmt.Errorf("rewriting %s: %w", fetch.CachePath, err)
+	}
+	return bytes.NewReader(rewritten), nil
 }
 
 // purgeIdleCaches drops cached files that no build has asked for within their

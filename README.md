@@ -1,10 +1,9 @@
 <p align="center">
 <img src="docs/assets/img/logo.png"/>
-<h1 align="inline">Pixelib Arca</h1>
-<hr />
 </p>
 
-A Maven and npm repository server that runs as a single Go binary.
+# Arca [![Release](https://github.com/pixelib/arca/actions/workflows/release.yml/badge.svg)](https://github.com/pixelib/arca/actions/workflows/release.yml) [![CI](https://github.com/pixelib/arca/actions/workflows/ci.yml/badge.svg)](https://github.com/pixelib/arca/actions/workflows/ci.yml)
+A Maven, npm and Eclipse p2 repository server that runs as a single Go binary.
 
 ![Arca](docs/assets/img/repositories.jpg)
 
@@ -12,6 +11,7 @@ Artifacts live on disk, metadata lives in SQLite, and the React UI is embedded i
 is no separate database to run and no config file to write before the first start.
 
 - Maven 2 and npm repositories, hosted or proxying a remote
+- Eclipse p2 update sites, hosted or proxied and cached, for PDE and Tycho
 - Release, prerelease and mixed version policies
 - Public repositories readable without an account, private ones granted per user
 - Generated `maven-metadata.xml` and npm packuments, built from the database
@@ -59,6 +59,7 @@ make test       # go tests plus a frontend typecheck
 | `internal/format` | the format seam: coordinates, layouts, version ordering |
 | `internal/maven` | Maven coordinates, version ordering, metadata rendering |
 | `internal/npm` | npm routes, semver, packuments, publish parsing |
+| `internal/p2` | p2 paths, OSGi versions, artifact document rewriting |
 | `internal/proxy` | upstream HTTP client and fetch deduplication |
 | `internal/blob` | artifact storage on disk |
 | `internal/frontend` | React app plus the `go:embed` handler |

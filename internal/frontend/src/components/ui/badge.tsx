@@ -33,7 +33,9 @@ export function TypeBadge({ type }: { type: string }) {
 }
 
 export function FormatBadge({ format }: { format: RepositoryFormat }) {
-  return <Badge variant={format === 'npm' ? 'primary' : 'neutral'}>{formatLabel(format)}</Badge>
+  return (
+    <Badge variant={format === 'maven2' ? 'neutral' : 'primary'}>{formatLabel(format)}</Badge>
+  )
 }
 
 export function PolicyBadge({ policy }: { policy: string }) {

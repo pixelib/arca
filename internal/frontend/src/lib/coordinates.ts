@@ -21,5 +21,7 @@ export function coordinateLabel(
 }
 
 export function formatLabel(format: RepositoryFormat): string {
-  return format === 'npm' ? 'npm' : 'Maven'
+  if (format === 'npm') return 'npm'
+  if (format === 'p2') return 'p2'
+  return 'Maven'
 }

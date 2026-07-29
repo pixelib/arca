@@ -1,7 +1,7 @@
 ---
 title: Managing an installation
 layout: default
-nav_order: 6
+nav_order: 7
 ---
 
 # Managing an installation

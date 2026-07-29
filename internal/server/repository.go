@@ -39,11 +39,14 @@ func (s *Server) handleRepository(writer http.ResponseWriter, request *http.Requ
 
 	path := strings.TrimPrefix(strings.TrimPrefix(request.URL.Path, "/repository/"+name), "/")
 
-	if repository.Format == format.NPM {
+	switch repository.Format {
+	case format.NPM:
 		s.serveNPM(writer, request, repository, path)
-		return
+	case format.P2:
+		s.serveP2(writer, request, repository, path)
+	default:
+		s.serveMaven(writer, request, repository, path)
 	}
-	s.serveMaven(writer, request, repository, path)
 }
 
 func (s *Server) authorize(writer http.ResponseWriter, request *http.Request, repository *models.Repository, required string) bool {

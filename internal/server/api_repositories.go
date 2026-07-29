@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"arca/internal/format"
@@ -20,7 +21,7 @@ var (
 	visibilities    = []string{models.VisibilityPublic, models.VisibilityPrivate}
 	permissions     = []string{models.PermissionRead, models.PermissionWrite, models.PermissionAdmin}
 	repositoryTypes = []string{models.TypeHosted, models.TypeProxy}
-	formats         = []string{format.Maven2, format.NPM}
+	formats         = []string{format.Maven2, format.NPM, format.P2}
 )
 
 type repositoryResponse struct {
@@ -252,6 +253,9 @@ func (s *Server) routeCreateRepository(writer http.ResponseWriter, request *http
 
 	remoteURL, err := normalizeRemote(repositoryType, body.RemoteURL)
 	if err != nil {
+		return err
+	}
+	if err := validateP2(repositoryFormat, repositoryType, remoteURL); err != nil {
 		return err
 	}
 
@@ -541,4 +545,21 @@ func orDefault(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// validateP2 pins a p2 proxy to a host root. Composite sites routinely point at
+// children above their own directory, as the Eclipse release train does with
+// '../../technology/epp/packages/', so a remote pinned to one update site loses
+// half its children. Proxying the host root keeps those resolvable inside this
+// repository. A hosted p2 repository has no remote and no such constraint.
+func validateP2(repositoryFormat, repositoryType, remoteURL string) error {
+	if repositoryFormat != format.P2 || repositoryType != models.TypeProxy {
+		return nil
+	}
+
+	parsed, err := url.Parse(remoteURL)
+	if err != nil || strings.Trim(parsed.Path, "/") != "" {
+		return fail(http.StatusBadRequest, "remoteUrl for a p2 proxy must be a host root, such as https://download.eclipse.org")
+	}
+	return nil
 }

@@ -6,18 +6,18 @@ nav_order: 1
 
 # Arca
 
-An artifact repository server that runs as a single Go binary. It speaks Maven 2 and npm, stores
-artifacts on disk, keeps metadata in SQLite, and serves an embedded React UI from the same process.
-There is no separate database to run, no application server, and no config file to write before the
-first start.
+An artifact repository server that runs as a single Go binary. It speaks Maven 2, npm and Eclipse p2,
+stores artifacts on disk, keeps metadata in SQLite, and serves an embedded React UI from the same
+process. There is no separate database to run, no application server, and no config file to write
+before the first start.
 
 ![The repository index]({{ site.baseurl }}/assets/img/repositories.jpg)
 
 ## What it does
 
-- **Two formats.** Maven 2 and npm, chosen per repository and fixed once it exists.
-- **Hosted and proxy repositories.** Publish to a hosted repository, or mirror Maven Central and
-  registry.npmjs.org through a proxy that caches what it serves.
+- **Three formats.** Maven 2, npm and Eclipse p2, chosen per repository and fixed once it exists.
+- **Hosted and proxy repositories.** Publish to a hosted repository, or mirror Maven Central,
+  registry.npmjs.org and download.eclipse.org through a proxy that caches what it serves.
 - **Version policies.** A repository takes releases only, prereleases only, or both.
 - **Per user permissions.** Public repositories are readable without an account. Private ones are
   granted per user, per repository.
@@ -33,6 +33,7 @@ first start.
 | Run it locally and look around | [Installing]({{ site.baseurl }}/installing) |
 | Resolve and publish jars | [Using it from Maven]({{ site.baseurl }}/maven) |
 | Resolve and publish packages | [Using it from npm]({{ site.baseurl }}/npm) |
+| Resolve Eclipse bundles and features | [Using it from Eclipse]({{ site.baseurl }}/p2) |
 | Put it on a server | [Deploying]({{ site.baseurl }}/deploying) |
 | Run it day to day | [Managing an installation]({{ site.baseurl }}/managing) |
 
