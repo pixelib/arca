@@ -92,14 +92,15 @@ var decoyHash = sync.OnceValue(func() string {
 // throttled per client address and per account, takes the same time whether the
 // account exists or not, and remembers a verified pair for a while so a client
 // that presents Basic credentials on every request is not charged a key
-// derivation each time.
+// derivation each time. An account without a password, one that signs in only
+// through the identity provider, is rejected the same way as a missing one.
 func (r *Resolver) Authenticate(address, login, password string) (*models.User, error) {
 	if ok, wait := r.guard.Allow(address, login); !ok {
 		return nil, ThrottledError{RetryAfter: wait}
 	}
 
 	user, err := r.store.UserByEmail(login)
-	if err != nil || user.Disabled {
+	if err != nil || user.Disabled || user.PasswordHash == "" {
 		VerifyPassword(password, decoyHash())
 		r.guard.Fail(address, login)
 		return nil, ErrInvalidCredentials

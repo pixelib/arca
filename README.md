@@ -16,6 +16,7 @@ is no separate database to run and no config file to write before the first star
   in the UI
 - Release, prerelease and mixed version policies
 - Public repositories readable without an account, private ones granted per user
+- Single sign-on through any OpenID Connect provider, with group-based access and admin roles
 - Deployment links: a fixed URL that downloads the newest matching file of an artifact, without
   authentication, even from a private repository
 - Repositories can be renamed, with the old name left redirecting until something else claims it

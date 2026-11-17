@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { BrandSplotch, Mark } from '@/components/brand'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { WelcomeEditor } from '@/components/welcome-editor'
 import { ApiError, post } from '@/lib/api'
 import { useRefreshSession, useSession } from '@/lib/session'
 import { cn } from '@/lib/utils'
+import { oidcErrors } from '@/routes/login'
 
 const STEPS = [
   {
@@ -28,36 +29,101 @@ const STEPS = [
   { title: 'Repositories', blurb: 'Optionally create a starting set of Maven and npm repositories.' },
 ] as const
 
+// The wizard's fields are kept here while the browser is away signing in with
+// the identity provider, so it comes back to the administrator step with them
+// still filled in. The setup token is part of the draft. That is accepted: it
+// sits in sessionStorage, which is per tab, only across the redirect, the next
+// load removes it, and the token is useless once setup completes. Moving the
+// sign-in button to the first step would avoid storing it but was rejected to
+// keep the wizard's flow unchanged. The password is left out.
+const DRAFT_KEY = 'cn-setup-draft'
+
+interface Draft {
+  step: number
+  setupToken: string
+  instanceName: string
+  themeColor: string
+  welcomeText: string
+  name: string
+  email: string
+  seedRepositories: boolean
+  publicByDefault: boolean
+}
+
+function readDraft(): Draft | null {
+  try {
+    const saved = sessionStorage.getItem(DRAFT_KEY)
+    return saved ? (JSON.parse(saved) as Draft) : null
+  } catch {
+    return null
+  }
+}
+
+function forgetDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // Nothing was saved without storage either.
+  }
+}
+
 export function SetupRoute() {
   const session = useSession()
-  const [step, setStep] = useState(0)
-  const [setupToken, setSetupToken] = useState('')
-  const [instanceName, setInstanceName] = useState('arca')
-  const [themeColor, setThemeColor] = useState('#4f46e5')
-  const [welcomeText, setWelcomeText] = useState(session.welcomeText)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const { oidc, setupIdentity } = session
+  const [searchParams] = useSearchParams()
+  const [draft] = useState(readDraft)
+  const [step, setStep] = useState(draft?.step ?? 0)
+  const [setupToken, setSetupToken] = useState(draft?.setupToken ?? '')
+  const [instanceName, setInstanceName] = useState(draft?.instanceName ?? 'arca')
+  const [themeColor, setThemeColor] = useState(draft?.themeColor ?? '#4f46e5')
+  const [welcomeText, setWelcomeText] = useState(draft?.welcomeText ?? session.welcomeText)
+  const [name, setName] = useState(draft?.name ?? '')
+  const [email, setEmail] = useState(draft?.email ?? '')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
-  const [seedRepositories, setSeedRepositories] = useState(true)
-  const [publicByDefault, setPublicByDefault] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [seedRepositories, setSeedRepositories] = useState(draft?.seedRepositories ?? true)
+  const [publicByDefault, setPublicByDefault] = useState(draft?.publicByDefault ?? false)
+  const [error, setError] = useState<string | null>(
+    () => oidcErrors[searchParams.get('error') ?? ''] ?? null,
+  )
   const [busy, setBusy] = useState(false)
   const refresh = useRefreshSession()
   const navigate = useNavigate()
+
+  useEffect(forgetDraft, [])
 
   useEffect(() => {
     if (isThemeColor(themeColor)) document.documentElement.style.setProperty('--brand', themeColor)
   }, [themeColor])
 
+  const saveDraft = () => {
+    const saved: Draft = {
+      step,
+      setupToken,
+      instanceName,
+      themeColor,
+      welcomeText,
+      name,
+      email,
+      seedRepositories,
+      publicByDefault,
+    }
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(saved))
+    } catch {
+      // Without storage the wizard just starts over.
+    }
+  }
+
   const stepValid =
     step === 0
       ? setupToken.trim().length > 0 && instanceName.trim().length > 0 && isThemeColor(themeColor)
       : step === 2
-        ? name.trim().length > 0 &&
+        ? setupIdentity !== null ||
+          (name.trim().length > 0 &&
           /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) &&
           password.length >= 10 &&
-          password === confirmation
+          password === confirmation)
         : true
 
   const submit = async (event: FormEvent) => {
@@ -75,12 +141,15 @@ export function SetupRoute() {
         instanceName: instanceName.trim(),
         themeColor,
         welcomeText,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        password,
+        // Signed in through the provider, the server takes the administrator from
+        // there; the email only confirms which identity this wizard showed.
+        ...(setupIdentity
+          ? { email: setupIdentity.email }
+          : { name: name.trim(), email: email.trim().toLowerCase(), password }),
         seedRepositories,
         publicByDefault,
       })
+      forgetDraft()
       await refresh()
       navigate('/', { replace: true })
     } catch (cause) {
@@ -176,8 +245,26 @@ export function SetupRoute() {
             <WelcomeEditor value={welcomeText} onChange={setWelcomeText} rows={14} />
           ) : null}
 
-          {step === 2 ? (
+          {step === 2 && setupIdentity ? (
+            <p className="rounded-2xl bg-muted p-4 text-sm">
+              Signed in as {setupIdentity.name} ({setupIdentity.email}) through {oidc?.name}
+            </p>
+          ) : null}
+
+          {step === 2 && !setupIdentity ? (
             <div className="space-y-5">
+              {oidc ? (
+                <>
+                  <Button asChild variant="outline" size="lg" className="w-full">
+                    <a href="/api/auth/oidc/login" onClick={saveDraft}>
+                      Continue with {oidc.name}
+                    </a>
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    or create a password account
+                  </p>
+                </>
+              ) : null}
               <Field label="Full name">
                 <Input
                   value={name}

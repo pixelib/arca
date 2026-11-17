@@ -20,6 +20,8 @@ func (s *Server) routes() {
 	api.Handle("/auth/logout", handler(s.routeLogout)).Methods(http.MethodPost)
 	api.Handle("/auth/me", handler(s.routeMe)).Methods(http.MethodGet)
 	api.Handle("/auth/password", handler(s.routeChangePassword)).Methods(http.MethodPost)
+	api.Handle("/auth/oidc/login", handler(s.routeOIDCLogin)).Methods(http.MethodGet)
+	api.Handle("/auth/oidc/callback", handler(s.routeOIDCCallback)).Methods(http.MethodGet)
 
 	api.Handle("/tokens", handler(s.routeListTokens)).Methods(http.MethodGet)
 	api.Handle("/tokens", handler(s.routeCreateToken)).Methods(http.MethodPost)

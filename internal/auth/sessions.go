@@ -46,7 +46,7 @@ func AttachSessionCookie(writer http.ResponseWriter, request *http.Request, toke
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isSecure(request),
+		Secure:   IsSecure(request),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(SessionTTL.Seconds()),
 	})
@@ -58,7 +58,7 @@ func ClearSessionCookie(writer http.ResponseWriter, request *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isSecure(request),
+		Secure:   IsSecure(request),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
@@ -72,6 +72,7 @@ func SessionToken(request *http.Request) string {
 	return cookie.Value
 }
 
-func isSecure(request *http.Request) bool {
+// IsSecure decides whether a cookie set on this request gets the Secure flag.
+func IsSecure(request *http.Request) bool {
 	return request.TLS != nil || request.Header.Get("X-Forwarded-Proto") == "https"
 }

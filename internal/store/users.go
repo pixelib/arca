@@ -48,6 +48,12 @@ func (s *Store) CountUsers() (int64, error) {
 	return count, err
 }
 
+func (s *Store) CountEnabledAdmins() (int64, error) {
+	var count int64
+	err := s.db.Model(&models.User{}).Where("role = ? AND disabled = ?", models.RoleAdmin, false).Count(&count).Error
+	return count, err
+}
+
 func (s *Store) UpdateUser(id string, changes map[string]any) (int64, error) {
 	result := s.db.Model(&models.User{}).Where("id = ?", id).Updates(changes)
 	return result.RowsAffected, result.Error
@@ -64,6 +70,9 @@ func (s *Store) DeleteUser(id string) (int64, error) {
 			return err
 		}
 		if err := tx.query().Where("user_id = ?", id).Delete(&models.Grant{}).Error; err != nil {
+			return err
+		}
+		if err := tx.query().Where("user_id = ?", id).Delete(&models.Identity{}).Error; err != nil {
 			return err
 		}
 		if err := tx.query().Model(&models.Asset{}).Where("uploaded_by = ?", id).Update("uploaded_by", nil).Error; err != nil {

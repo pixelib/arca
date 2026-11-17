@@ -28,15 +28,21 @@ type testInstance struct {
 
 func newTestInstance(t *testing.T) *testInstance {
 	t.Helper()
+	return newConfiguredInstance(t, config.Config{})
+}
+
+// newConfiguredInstance starts an instance from the given configuration, with
+// its database and storage placed in a temporary directory.
+func newConfiguredInstance(t *testing.T, configuration config.Config) *testInstance {
+	t.Helper()
 
 	directory := t.TempDir()
 	storage := filepath.Join(directory, "storage")
 
-	instance, err := New(config.Config{
-		DatabasePath:   filepath.Join(directory, "arca.db"),
-		StorageDir:     storage,
-		MaxUploadBytes: 1 << 20,
-	})
+	configuration.DatabasePath = filepath.Join(directory, "arca.db")
+	configuration.StorageDir = storage
+	configuration.MaxUploadBytes = 1 << 20
+	instance, err := New(configuration)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

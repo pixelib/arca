@@ -14,6 +14,11 @@ type managedUser struct {
 	Role      string `json:"role"`
 	Disabled  int    `json:"disabled"`
 	CreatedAt int64  `json:"created_at"`
+	// SSO marks an account linked to the configured identity provider.
+	SSO bool `json:"sso"`
+	// RoleManaged marks a linked account whose role the provider's admin groups
+	// set at every sign-in, so it cannot be changed here.
+	RoleManaged bool `json:"role_managed"`
 }
 
 func toManagedUser(user models.User) managedUser {
@@ -43,9 +48,23 @@ func (s *Server) routeListUsers(writer http.ResponseWriter, request *http.Reques
 		return err
 	}
 
+	linked := map[string]bool{}
+	if s.oidc != nil {
+		ids, err := s.store.IdentityUserIDs(s.config.OIDC.Issuer)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			linked[id] = true
+		}
+	}
+
 	responses := make([]managedUser, 0, len(users))
 	for _, user := range users {
-		responses = append(responses, toManagedUser(user))
+		response := toManagedUser(user)
+		response.SSO = linked[user.ID]
+		response.RoleManaged = response.SSO && len(s.config.OIDC.AdminGroups) > 0
+		responses = append(responses, response)
 	}
 
 	writeJSON(writer, http.StatusOK, map[string]any{"users": responses})
@@ -140,6 +159,17 @@ func (s *Server) routeUpdateUser(writer http.ResponseWriter, request *http.Reque
 		role, err := requireOneOf(*body.Role, roles, "role")
 		if err != nil {
 			return err
+		}
+		// With admin groups configured the next sign-in through the provider
+		// would undo the change, so it is refused up front.
+		if len(s.config.OIDC.AdminGroups) > 0 {
+			linked, err := s.store.HasIdentity(id, s.config.OIDC.Issuer)
+			if err != nil {
+				return err
+			}
+			if linked {
+				return fail(http.StatusConflict, "This user's role is set by the identity provider's groups")
+			}
 		}
 		changes["role"] = role
 	}

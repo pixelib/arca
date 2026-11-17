@@ -50,6 +50,7 @@ before the first start.
 | Move off Sonatype Nexus | [Migrating from Nexus]({{ site.baseurl }}/migrating) |
 | Put it on a server | [Deploying]({{ site.baseurl }}/deploying) |
 | Run it day to day | [Managing an installation]({{ site.baseurl }}/managing) |
+| Sign in through your identity provider | [Single sign-on]({{ site.baseurl }}/oidc) |
 
 ## Need help?
 [Join our Discord!](https://discord.gg/cep5gXDVHf) Our lovely developer and friends will try to help you out.

@@ -128,6 +128,9 @@ export interface Bootstrap {
   logoUrl: string
   build: Build
   user: User | null
+  oidc: { name: string } | null
+  // Who signed in through the provider before setup, to become the administrator.
+  setupIdentity: { name: string; email: string } | null
 }
 
 export interface InstanceSettings {
@@ -339,6 +342,10 @@ export interface ManagedUser {
   role: Role
   disabled: number
   created_at: number
+  // Linked to the identity provider.
+  sso: boolean
+  // The provider's admin groups set this account's role, so it cannot be changed here.
+  role_managed: boolean
 }
 
 export interface Grant {

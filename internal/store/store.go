@@ -87,6 +87,7 @@ func (s *Store) migrate() error {
 	return s.db.AutoMigrate(
 		&models.Setting{},
 		&models.User{},
+		&models.Identity{},
 		&models.Session{},
 		&models.APIToken{},
 		&models.Category{},

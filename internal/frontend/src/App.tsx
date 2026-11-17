@@ -23,7 +23,12 @@ function Router() {
   const location = useLocation()
 
   if (!initialized) {
-    return location.pathname === '/setup' ? <SetupRoute /> : <Navigate to="/setup" replace />
+    // The search is kept so an OIDC ?error= reaches the wizard.
+    return location.pathname === '/setup' ? (
+      <SetupRoute />
+    ) : (
+      <Navigate to={{ pathname: '/setup', search: location.search }} replace />
+    )
   }
 
   if (location.pathname === '/setup') return <Navigate to="/" replace />

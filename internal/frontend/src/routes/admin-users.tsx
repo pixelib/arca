@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2 } from 'lucide-react'
+import { KeyRound, Plus, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -100,7 +100,7 @@ function CreateUserDialog() {
 }
 
 export function AdminUsersRoute() {
-  const { user: currentUser } = useSession()
+  const { user: currentUser, oidc } = useSession()
   const queryClient = useQueryClient()
   const { data, error, isLoading } = useQuery({
     queryKey: ['users'],
@@ -149,15 +149,29 @@ export function AdminUsersRoute() {
           <TableBody>
             {(data?.users ?? []).map((user) => (
               <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.name}</TableCell>
+                <TableCell className="font-medium">
+                  {user.name}
+                  {user.sso ? (
+                    <Badge
+                      variant="primary"
+                      className="ml-2 size-5 justify-center p-0 align-middle"
+                      role="img"
+                      aria-label={`Signs in through ${oidc?.name}`}
+                      title={`Signs in through ${oidc?.name}`}
+                    >
+                      <KeyRound className="size-3" />
+                    </Badge>
+                  ) : null}
+                </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   {user.email}
                 </TableCell>
                 <TableCell>
                   <Select
-                    className="h-8 w-32 text-xs"
+                    className="h-8 w-36 text-xs"
                     value={user.role}
-                    disabled={user.id === currentUser.id}
+                    disabled={user.id === currentUser.id || user.role_managed}
+                    title={user.role_managed ? `Set by ${oidc?.name} groups` : undefined}
                     onChange={(event) =>
                       update.mutate({ id: user.id, body: { role: event.target.value } })
                     }

@@ -37,6 +37,27 @@ type Config struct {
 	// SetupToken gates the first-run wizard. Empty generates one at startup and
 	// prints it to the log.
 	SetupToken string
+
+	OIDC OIDC
+}
+
+// OIDC configures single sign-on through an OpenID Connect provider. An empty
+// Issuer leaves it off.
+type OIDC struct {
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	// Name labels the sign-in button.
+	Name        string
+	Scopes      []string
+	GroupsClaim string
+	// AdminGroups, when set, hands the IdP control over who is an administrator.
+	AdminGroups []string
+	// AllowedGroups, when set, turns away anyone in none of them.
+	AllowedGroups []string
+	// LinkExisting lets a first sign-in claim an account that already has the
+	// same email, which trusts the IdP to have verified that address.
+	LinkExisting bool
 }
 
 func Parse(arguments []string) (Config, error) {
@@ -44,6 +65,7 @@ func Parse(arguments []string) (Config, error) {
 
 	config := Config{}
 	var proxyTimeoutSeconds int64
+	var oidcScopes, oidcAdminGroups, oidcAllowedGroups string
 
 	flags.BoolVar(&config.DevMode, "dev", envBool("DEV_MODE", false), "proxy the frontend to a running vite dev server instead of serving the embedded bundle")
 	flags.Int64Var(&proxyTimeoutSeconds, "proxy-timeout", envInt64("PROXY_TIMEOUT_SECONDS", int64(DefaultProxyTimeout/time.Second)), "how long a proxy repository waits for its upstream, in seconds")
@@ -56,7 +78,25 @@ func Parse(arguments []string) (Config, error) {
 	flags.StringVar(&config.BaseURL, "base-url", envString("BASE_URL", ""), "public URL this server is reached at, such as https://artifacts.example.com; derived from each request when empty")
 	flags.StringVar(&config.SetupToken, "setup-token", envString("SETUP_TOKEN", ""), "token the first-run setup wizard asks for; generated and logged when empty")
 
+	flags.StringVar(&config.OIDC.Issuer, "oidc-issuer", envString("OIDC_ISSUER", ""), "OpenID Connect issuer URL; enables single sign-on when set")
+	flags.StringVar(&config.OIDC.ClientID, "oidc-client-id", envString("OIDC_CLIENT_ID", ""), "OpenID Connect client id")
+	flags.StringVar(&config.OIDC.ClientSecret, "oidc-client-secret", envString("OIDC_CLIENT_SECRET", ""), "OpenID Connect client secret")
+	flags.StringVar(&config.OIDC.Name, "oidc-name", envString("OIDC_NAME", "SSO"), "provider name shown on the sign-in button")
+	flags.StringVar(&oidcScopes, "oidc-scopes", envString("OIDC_SCOPES", "openid profile email"), "space-separated scopes to request")
+	flags.StringVar(&config.OIDC.GroupsClaim, "oidc-groups-claim", envString("OIDC_GROUPS_CLAIM", "groups"), "ID token claim that lists the user's groups")
+	flags.StringVar(&oidcAdminGroups, "oidc-admin-groups", envString("OIDC_ADMIN_GROUPS", ""), "comma-separated groups whose members are administrators; empty leaves roles alone")
+	flags.StringVar(&oidcAllowedGroups, "oidc-allowed-groups", envString("OIDC_ALLOWED_GROUPS", ""), "comma-separated groups allowed to sign in; empty allows everyone")
+	flags.BoolVar(&config.OIDC.LinkExisting, "oidc-link-existing", envBool("OIDC_LINK_EXISTING", false), "link a first sign-in to an existing account with the same email")
+
 	if err := flags.Parse(arguments); err != nil {
+		return Config{}, err
+	}
+	config.OIDC.Scopes = strings.Fields(oidcScopes)
+	config.OIDC.AdminGroups = commaList(oidcAdminGroups)
+	config.OIDC.AllowedGroups = commaList(oidcAllowedGroups)
+	if config.OIDC.Issuer != "" && (config.OIDC.ClientID == "" || config.OIDC.ClientSecret == "") {
+		err := errors.New("oidc-issuer requires oidc-client-id and oidc-client-secret")
+		fmt.Fprintln(flags.Output(), err)
 		return Config{}, err
 	}
 	if config.MaxUploadBytes <= 0 {
@@ -102,6 +142,18 @@ func NormalizeBaseURL(raw string) (string, error) {
 	parsed.RawPath = ""
 
 	return parsed.String(), nil
+}
+
+// commaList splits a comma-separated value, dropping blanks around and between
+// entries.
+func commaList(value string) []string {
+	var entries []string
+	for _, entry := range strings.Split(value, ",") {
+		if entry = strings.TrimSpace(entry); entry != "" {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
 }
 
 func envString(key, fallback string) string {

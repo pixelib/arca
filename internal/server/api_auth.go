@@ -69,14 +69,28 @@ func (s *Server) routeBootstrap(writer http.ResponseWriter, request *http.Reques
 		welcomeText = store.DefaultWelcomeText
 	}
 
+	var oidc any
+	if s.oidc != nil {
+		oidc = map[string]string{"name": s.config.OIDC.Name}
+	}
+
+	// Who the wizard's administrator step would be, once signed in through the
+	// provider.
+	var setupIdentity any
+	if claims, ok := s.setupIdentity(request); !initialized && ok {
+		setupIdentity = map[string]string{"name": claims.Name, "email": claims.Email}
+	}
+
 	writeJSON(writer, http.StatusOK, map[string]any{
-		"initialized":  initialized,
-		"instanceName": s.store.InstanceName(),
-		"themeColor":   s.store.ThemeColor(),
-		"welcomeText":  welcomeText,
-		"logoUrl":      logoURL(s.store.Logo()),
-		"build":        version.Current(),
-		"user":         identityOf(currentUser(request)),
+		"initialized":   initialized,
+		"instanceName":  s.store.InstanceName(),
+		"themeColor":    s.store.ThemeColor(),
+		"welcomeText":   welcomeText,
+		"logoUrl":       logoURL(s.store.Logo()),
+		"build":         version.Current(),
+		"user":          identityOf(currentUser(request)),
+		"oidc":          oidc,
+		"setupIdentity": setupIdentity,
 	})
 	return nil
 }
@@ -145,30 +159,32 @@ func (s *Server) routeSetup(writer http.ResponseWriter, request *http.Request) e
 			return err
 		}
 	}
-	name, err := requireText(body.Name, "name", 120)
-	if err != nil {
-		return err
-	}
-	email, err := validateEmail(body.Email)
-	if err != nil {
-		return err
-	}
-	password, err := validatePassword(body.Password)
-	if err != nil {
-		return err
-	}
+	administrator := &models.User{ID: store.NewID(), Role: models.RoleAdmin}
 
-	hash, err := auth.HashPassword(password)
-	if err != nil {
-		return err
-	}
-
-	administrator := &models.User{
-		ID:           store.NewID(),
-		Email:        email,
-		Name:         name,
-		PasswordHash: hash,
-		Role:         models.RoleAdmin,
+	// An identity signed in through the provider becomes the administrator
+	// instead of the name, email and password.
+	claims, viaOIDC := s.setupIdentity(request)
+	if viaOIDC {
+		// The wizard sends back the email it showed, so signing in as someone
+		// else in another tab cannot swap the administrator under it.
+		if body.Email != claims.Email {
+			return fail(http.StatusConflict, "The signed-in identity has changed. Reload the page and check who it shows.")
+		}
+		administrator.Name, administrator.Email = claims.Name, claims.Email
+	} else {
+		if administrator.Name, err = requireText(body.Name, "name", 120); err != nil {
+			return err
+		}
+		if administrator.Email, err = validateEmail(body.Email); err != nil {
+			return err
+		}
+		password, err := validatePassword(body.Password)
+		if err != nil {
+			return err
+		}
+		if administrator.PasswordHash, err = auth.HashPassword(password); err != nil {
+			return err
+		}
 	}
 
 	visibility := models.VisibilityPrivate
@@ -183,6 +199,11 @@ func (s *Server) routeSetup(writer http.ResponseWriter, request *http.Request) e
 		}
 		if err := tx.CreateUser(administrator); err != nil {
 			return err
+		}
+		if viaOIDC {
+			if err := tx.CreateIdentity(&models.Identity{Issuer: s.config.OIDC.Issuer, Subject: claims.Subject, UserID: administrator.ID}); err != nil {
+				return err
+			}
 		}
 		if err := tx.SetSetting(store.SettingInstanceName, instanceName); err != nil {
 			return err
@@ -220,6 +241,8 @@ func (s *Server) routeSetup(writer http.ResponseWriter, request *http.Request) e
 	// The token has done its job; forgetting it closes the route for good
 	// without another database read.
 	s.setupToken = ""
+	s.setupIdentities.Clear()
+	setSetupIdentityCookie(writer, request, "", -1)
 
 	if err := s.startSession(writer, request, administrator.ID); err != nil {
 		return err
